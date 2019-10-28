@@ -3,6 +3,7 @@ package com.iakie.book;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -16,7 +17,9 @@ import android.widget.TextView;
 import com.google.gson.Gson;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.AsyncHttpResponseHandler;
+import com.loopj.android.http.FileAsyncHttpResponseHandler;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +39,7 @@ public class BookListActivity extends AppCompatActivity {
     private static final String TAG = "BookListActivity";
     private ListView mlistView;
     private List<BookListResult.Book> mBooks = new ArrayList<>();
+    private AsyncHttpClient mclient;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -45,8 +49,8 @@ public class BookListActivity extends AppCompatActivity {
         mlistView = findViewById(R.id.book_list_view);
         String url = "http://www.imooc.com/api/teacher?type=10";
 
-        AsyncHttpClient client = new AsyncHttpClient();
-        client.get(url, new AsyncHttpResponseHandler() {
+        mclient = new AsyncHttpClient();
+        mclient.get(url, new AsyncHttpResponseHandler() {
             @Override
             public void onStart() {
                 super.onStart();
@@ -100,7 +104,7 @@ public class BookListActivity extends AppCompatActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            BookListResult.Book book = mBooks.get(position);
+            final BookListResult.Book book = mBooks.get(position);
 
             ViewHolder viewHolder = new ViewHolder();
             if (convertView == null){
@@ -113,6 +117,43 @@ public class BookListActivity extends AppCompatActivity {
                 viewHolder = (ViewHolder) convertView.getTag();
             }
             viewHolder.mNameTextView.setText(book.getBookname());
+
+            final String path = Environment.getExternalStorageDirectory() + "/iqiqiya/" + book.getBookname() + ".txt";
+            final File file = new File(path);
+
+            viewHolder.mButton.setText(file.exists() ? "点击打开" : "点击下载");
+
+            final ViewHolder finalViewHolder = viewHolder;
+            viewHolder.mButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    //下载的功能
+                    if (file.exists()){
+                        // TODO: 打开书籍
+                    } else {
+                        mclient.addHeader("Accept-Encoding","identity");
+                        mclient.get(book.getBookfile(), new FileAsyncHttpResponseHandler(
+                                file) {
+                            @Override
+                            public void onFailure(int statusCode, Header[] headers, Throwable throwable, File file) {
+                                finalViewHolder.mButton.setText("下载失败");
+                            }
+
+                            @Override
+                            public void onSuccess(int statusCode, Header[] headers, File file) {
+                                finalViewHolder.mButton.setText("点击打开");
+                            }
+
+                            @Override
+                            public void onProgress(long bytesWritten, long totalSize) {
+                                //进度
+                                super.onProgress(bytesWritten, totalSize);
+                                finalViewHolder.mButton.setText(bytesWritten * 100 / totalSize +"%");
+                            }
+                        });
+                    }
+                }
+            });
             return convertView;
         }
     }
